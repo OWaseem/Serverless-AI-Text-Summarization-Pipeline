@@ -154,6 +154,14 @@ Retrieves a previously stored result by ID.
 
 The pipeline is a standard HTTP API — anything that can make a web request can use it. Place the text you want summarized in the `"text"` field of the request body.
 
+### Postman
+1. Import `postman/collection.json` into Postman
+2. Set the `base_url` collection variable to your API Gateway URL
+3. Add header `x-api-key` with your API key value
+4. Open **POST /summarize** → go to the **Body** tab → paste your text into the `"text"` field
+5. Hit **Send** — the response returns your summary, sentiment, and a record ID
+6. Use that ID with **GET /summary/{id}** to retrieve the result at any time
+
 ### curl (terminal)
 ```bash
 curl -X POST https://your-api-id.execute-api.us-east-1.amazonaws.com/Prod/summarize \
