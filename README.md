@@ -1,6 +1,6 @@
 # Serverless AI Text Summarization Pipeline
 
-A production-style serverless pipeline that accepts text via a REST API, summarizes it using Amazon Bedrock (Claude 3 Haiku), tags its sentiment, and stores the results in DynamoDB for fast retrieval — all without managing a single server.
+A production-style serverless pipeline that accepts text via a REST API, summarizes it using Amazon Bedrock (Claude Haiku 4.5), tags its sentiment, and stores the results in DynamoDB for fast retrieval — all without managing a single server.
 
 ---
 
@@ -16,7 +16,7 @@ The result is stored persistently and retrievable instantly — so you're not ju
 
 ---
 
-## Why Build This Instead of Using a Summarizer Website?
+## Why Not Just Use a Summarizer Website?
 
 You might wonder: why build this when you could just paste text into QuillBot or TLDR This?
 
@@ -35,11 +35,11 @@ You might wonder: why build this when you could just paste text into QuillBot or
 > A summarizer website is like a **calculator** — useful when a human sits down and uses it manually.
 > This pipeline is like a **spreadsheet formula** — it runs automatically, every time, on any data, without anyone touching it.
 
-**Ownership matters too.** When you use someone else's website, your data goes to their servers and you're dependent on their uptime and pricing. When you own the pipeline, your data stays in your AWS account and you control everything.
+**Ownership matters too.** Your data stays in your own AWS account — not on a third-party server. You control the model, the prompt, the output format, and the cost.
 
 ---
 
-## Who Benefits From This?
+## Who Is This For?
 
 | Use Case | How They Use It |
 |---|---|
@@ -47,34 +47,34 @@ You might wonder: why build this when you could just paste text into QuillBot or
 | News organizations | Tag article sentiment before publishing |
 | Customer support teams | Triage thousands of feedback responses automatically |
 | Research teams | Ingest and condense academic papers at scale |
-| Developers | Use this architecture as a blueprint for any AI automation task |
+| Developers | Drop this into any existing system via a single API call |
 
 ---
 
 ## Why Serverless?
 
-This project could have been built on a traditional server (like an EC2 instance). Serverless is better here for three reasons:
+This pipeline runs on AWS Lambda — meaning there is no server to manage, patch, or monitor.
 
-1. **No idle cost** — you pay only when someone actually calls the API. A traditional server costs money 24/7 whether it's being used or not.
-2. **Auto-scales automatically** — if 1,000 requests hit at once, AWS Lambda spins up 1,000 instances in parallel. A traditional server would queue them or crash.
-3. **Zero maintenance** — no patching, no uptime monitoring, no server management. The infrastructure takes care of itself.
+1. **No idle cost** — you pay only when the API is actually called. A traditional server costs money 24/7 whether it's being used or not.
+2. **Auto-scales automatically** — if 1,000 requests hit at once, AWS spins up 1,000 instances in parallel. A traditional server would queue them or crash.
+3. **Zero maintenance** — the infrastructure takes care of itself. No downtime, no intervention needed.
 
 ---
 
 ## Architecture
 
 ```
-Client (Postman / any app)
+Client (any app or API caller)
          │
          ▼
-    API Gateway
+    API Gateway  ◄── API Key Authentication (x-api-key header required)
          │
          ├── POST /summarize ──────► SummarizeFunction (Lambda)
          │                                    │
          │                          ┌─────────┴──────────┐
          │                          ▼                    ▼
          │                   Amazon Bedrock          DynamoDB
-         │                 (Claude 3 Haiku)        (store result)
+         │                 (Claude Haiku 4.5)      (store result)
          │                 summarize + sentiment
          │
          └── GET /summary/{id} ───► RetrieveFunction (Lambda)
@@ -88,56 +88,34 @@ CloudWatch automatically logs all Lambda activity.
 
 ---
 
-## AWS Services Used
+## What Powers This?
 
 ### API Gateway
-The front door of the application. It receives HTTP requests from the outside world and routes them to the correct Lambda function. Think of it as a traffic controller — it doesn't do any processing itself, it just directs requests to the right place.
+The entry point. Receives HTTP requests and routes them to the correct Lambda function. All endpoints are protected by **API key authentication** — unauthorized requests are rejected before they ever reach the pipeline.
 
 ### AWS Lambda
-The serverless compute layer. Lambda runs your Python code in response to events (in this case, API Gateway requests). It spins up automatically when needed and shuts down when done — you never manage a server.
+Serverless compute. Runs the pipeline logic in response to each request — no server required. Auto-scaling is built in by design.
 
-### Amazon Bedrock
-AWS's managed AI service. Instead of training a model yourself, you send a prompt to Bedrock and get an AI-generated response back. This project uses **Claude 3 Haiku** by Anthropic — the fastest and most cost-efficient Claude model, ideal for hitting sub-100ms processing targets.
-
-**Why Claude 3 Haiku specifically?**
-- Fastest response time in the Claude 3 family
-- Cheapest per token (~$0.00025 per 1,000 input tokens)
-- More than capable enough for summarization and sentiment tagging
-- Available directly through Amazon Bedrock — no separate Anthropic account needed
+### Amazon Bedrock (Claude Haiku 4.5)
+The AI brain. Sends text to Anthropic's Claude Haiku 4.5 model via AWS's managed Bedrock service and gets back a structured summary and sentiment label. Claude Haiku 4.5 is the latest and most efficient model in its class — optimized for speed and high-volume workloads.
 
 ### DynamoDB
-AWS's fully managed NoSQL database. It stores the summarization results (original text, summary, sentiment, timestamp) keyed by a unique ID. DynamoDB is built for single-digit millisecond retrieval — which is how this pipeline achieves sub-100ms read performance.
+Persistent storage. Every result is saved with its ID, original text, summary, sentiment, and timestamp. Built for sub-10ms retrieval — results come back in under 100ms.
 
 ### CloudWatch
-AWS's logging and monitoring service. Every Lambda invocation automatically writes logs to CloudWatch — what was received, what was sent to Bedrock, what was stored, and any errors. Zero configuration required.
-
----
-
-## Project Structure
-
-```
-Serverless_AI_Text_Summarization_Pipeline/
-├── template.yaml          # SAM template — defines ALL AWS infrastructure as code
-├── samconfig.toml         # SAM deploy config (region, stack name, S3 bucket)
-├── requirements.txt       # Python dependencies
-├── src/
-│   ├── summarize/
-│   │   └── handler.py    # POST /summarize — calls Bedrock, writes to DynamoDB
-│   └── retrieve/
-│       └── handler.py    # GET /summary/{id} — reads from DynamoDB
-└── postman/
-    └── collection.json   # Pre-built Postman collection to test both endpoints
-```
-
-### What is AWS SAM?
-AWS SAM (Serverless Application Model) is a framework for defining serverless infrastructure as code. Instead of clicking through the AWS Console to create Lambda functions, API Gateway routes, and DynamoDB tables manually, you define everything in a single `template.yaml` file and deploy it with two commands. This makes the infrastructure version-controlled, repeatable, and shareable.
+Automatic logging. Every invocation is logged — timestamps, duration, memory usage, errors — with zero configuration.
 
 ---
 
 ## API Reference
 
+All requests require the header:
+```
+x-api-key: <your-api-key>
+```
+
 ### POST /summarize
-Summarizes a piece of text and tags its sentiment.
+Submits text for summarization and sentiment tagging.
 
 **Request body:**
 ```json
@@ -151,12 +129,13 @@ Summarizes a piece of text and tags its sentiment.
 {
   "id": "a1b2c3d4-...",
   "summary": "Condensed version of the text.",
-  "sentiment": "positive"
+  "sentiment": "neutral",
+  "timestamp": "2026-03-29T00:09:31.272043+00:00"
 }
 ```
 
 ### GET /summary/{id}
-Retrieves a previously stored summarization result by ID.
+Retrieves a previously stored result by ID.
 
 **Response:**
 ```json
@@ -164,50 +143,10 @@ Retrieves a previously stored summarization result by ID.
   "id": "a1b2c3d4-...",
   "original_text": "Your original text...",
   "summary": "Condensed version of the text.",
-  "sentiment": "positive",
-  "timestamp": "2025-09-15T14:23:01.123456"
+  "sentiment": "neutral",
+  "timestamp": "2026-03-29T00:09:31.272043+00:00"
 }
 ```
-
----
-
-## Prerequisites
-
-Before deploying, make sure you have:
-
-- [ ] An AWS account
-- [ ] [AWS CLI](https://aws.amazon.com/cli/) installed and configured (`aws configure`)
-- [ ] [AWS SAM CLI](https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/install-sam-cli.html) installed
-- [ ] Amazon Bedrock model access enabled for **Claude 3 Haiku** in the AWS Console (Bedrock → Model access → Request access)
-- [ ] [Postman](https://www.postman.com/downloads/) installed for testing
-
----
-
-## Deployment
-
-```bash
-# 1. Build the project (packages Lambda code and dependencies)
-sam build
-
-# 2. Deploy to AWS (first time — walks you through setup)
-sam deploy --guided
-
-# On subsequent deploys:
-sam deploy
-```
-
-After deploying, SAM will output your **API Gateway URL**. Copy it — you'll need it in Postman.
-
----
-
-## Testing with Postman
-
-1. Open Postman and import `postman/collection.json`
-2. Set the `base_url` collection variable to your API Gateway URL
-3. Run **POST /summarize** with sample text
-4. Copy the `id` from the response
-5. Run **GET /summary/{id}** using that ID
-6. Check AWS Console → CloudWatch → Log Groups to see Lambda logs
 
 ---
 
@@ -216,8 +155,51 @@ After deploying, SAM will output your **API Gateway URL**. Copy it — you'll ne
 | Decision | Choice | Reason |
 |---|---|---|
 | IaC framework | AWS SAM | Purpose-built for serverless, minimal boilerplate |
-| AI model | Claude 3 Haiku | Fastest + cheapest Claude model, hits latency targets |
+| AI model | Claude Haiku 4.5 | Latest Haiku — fastest and most capable in class |
+| Bedrock API | `converse` | Universal API compatible across all Claude models |
+| Authentication | API Key (x-api-key) | Protects endpoints from abuse without requiring full user auth |
 | Database | DynamoDB on-demand | No capacity planning, free-tier friendly, sub-10ms reads |
-| Runtime | Python 3.11 | Latest stable Lambda runtime, best boto3 support |
+| Runtime | Python 3.11 | Stable Lambda runtime with full boto3 support |
 | Lambda timeout | 30 seconds | Bedrock calls typically take 2–5s, leaving ample buffer |
-| Prompt design | Structured JSON output | Forces Haiku to return `{summary, sentiment}` — makes parsing reliable |
+
+---
+
+<details>
+<summary><strong>For Developers — Deploy Your Own Instance</strong></summary>
+
+### Prerequisites
+
+- An AWS account
+- AWS CLI installed and configured (`aws configure`)
+- AWS SAM CLI installed
+- Claude Haiku 4.5 access via Amazon Bedrock — go to Bedrock → Model catalog → Claude Haiku 4.5 → subscribe
+- Postman for testing
+
+### Deployment
+
+```bash
+# Build the project
+sam build
+
+# First-time deploy
+sam deploy --guided
+
+# Subsequent deploys
+sam build
+sam deploy
+```
+
+After deploying, SAM outputs:
+- **SummarizeApiUrl** — your API Gateway base URL
+- **ApiKeyId** — go to AWS Console → API Gateway → API Keys → find your key → click Show to retrieve the value
+
+### Testing with Postman
+
+1. Import `postman/collection.json` into Postman
+2. Set the `base_url` collection variable to your API Gateway URL
+3. Add header `x-api-key` with your key value to each request
+4. Run **POST /summarize** → copy the `id` from the response
+5. Run **GET /summary/{id}** using that ID
+6. Check CloudWatch → Log Management to view Lambda logs
+
+</details>
