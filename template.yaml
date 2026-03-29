@@ -1,0 +1,151 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: Serverless AI Text Summarization Pipeline
+
+# ---------------------------------------------------------------------------
+# Globals — settings shared across ALL Lambda functions in this template.
+# Instead of repeating Runtime, Timeout, etc. on every function, we set them
+# once here. Individual functions can override these if needed.
+# ---------------------------------------------------------------------------
+Globals:
+  Function:
+    Runtime: python3.11
+    Timeout: 30                   # Bedrock calls can take 2-5s, 30s gives plenty of headroom
+    MemorySize: 128               # 128 MB is the minimum — plenty for this workload
+    Environment:
+      Variables:
+        TABLE_NAME: !Ref SummaryTable   # Injects the DynamoDB table name into every Lambda at runtime
+  Api:
+    # Tells API Gateway to look for the API key in the request header:
+    # x-api-key: <your-key>
+    # Any request missing this header gets rejected with 403 Forbidden
+    # before it even reaches your Lambda — saving you money.
+    Auth:
+      ApiKeyRequired: true
+
+# ---------------------------------------------------------------------------
+# Resources — every AWS resource this project needs.
+# SAM will create ALL of these when you run `sam deploy`.
+# ---------------------------------------------------------------------------
+Resources:
+
+  # -------------------------------------------------------------------------
+  # SummarizeFunction
+  # This Lambda handles POST /summarize requests.
+  # It calls Bedrock to summarize + tag sentiment, then saves to DynamoDB.
+  # -------------------------------------------------------------------------
+  SummarizeFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: src/summarize/       # Where SAM looks for this Lambda's code
+      Handler: handler.lambda_handler  # filename.function_name — Lambda's entry point
+      Description: Accepts text, summarizes via Bedrock, stores result in DynamoDB
+      Policies:
+        # Grant this Lambda permission to write to the DynamoDB table
+        - DynamoDBCrudPolicy:
+            TableName: !Ref SummaryTable
+        # Grant this Lambda permission to call Bedrock models
+        - Statement:
+            Effect: Allow
+            Action:
+              - bedrock:InvokeModel
+            Resource: "*"
+      Events:
+        # This creates the API Gateway route: POST /summarize
+        SummarizeApi:
+          Type: Api
+          Properties:
+            Path: /summarize
+            Method: post
+
+  # -------------------------------------------------------------------------
+  # RetrieveFunction
+  # This Lambda handles GET /summary/{id} requests.
+  # It fetches a previously stored result from DynamoDB by ID.
+  # -------------------------------------------------------------------------
+  RetrieveFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: src/retrieve/
+      Handler: handler.lambda_handler
+      Description: Retrieves a stored summarization result from DynamoDB by ID
+      Policies:
+        # Read-only access to the DynamoDB table — this Lambda never writes
+        - DynamoDBReadPolicy:
+            TableName: !Ref SummaryTable
+      Events:
+        # This creates the API Gateway route: GET /summary/{id}
+        # {id} is a path parameter — it gets passed to the Lambda automatically
+        RetrieveApi:
+          Type: Api
+          Properties:
+            Path: /summary/{id}
+            Method: get
+
+  # -------------------------------------------------------------------------
+  # SummaryTable — DynamoDB Table
+  # Stores every summarization result.
+  # Primary key is `id` (a UUID string) — used to look up results.
+  # BillingMode PAY_PER_REQUEST means no capacity planning needed —
+  # you pay only for what you use, and it scales automatically.
+  # -------------------------------------------------------------------------
+  SummaryTable:
+    Type: AWS::Serverless::SimpleTable
+    Properties:
+      PrimaryKey:
+        Name: id
+        Type: String
+      TableName: SummarizationResults
+
+  # -------------------------------------------------------------------------
+  # ApiKey — the actual secret key callers must include in their requests.
+  # AWS generates the key value automatically.
+  # You retrieve it from the AWS Console after deploying.
+  # -------------------------------------------------------------------------
+  SummarizationApiKey:
+    Type: AWS::ApiGateway::ApiKey
+    Properties:
+      Name: SummarizationPipelineKey
+      Description: API key for the Serverless AI Text Summarization Pipeline
+      Enabled: true
+    DependsOn: ServerlessRestApiProdStage   # Key must be created after the API stage exists
+
+  # -------------------------------------------------------------------------
+  # UsagePlan — links the API key to the deployed API stage.
+  # Think of it as a membership plan: the API key is the card,
+  # and the usage plan is what that card grants access to.
+  # You can also set rate limits here (requests per second, daily quota) —
+  # useful for controlling costs in production.
+  # -------------------------------------------------------------------------
+  SummarizationUsagePlan:
+    Type: AWS::ApiGateway::UsagePlan
+    Properties:
+      UsagePlanName: SummarizationPipelineUsagePlan
+      Description: Usage plan linking the API key to the summarization API
+      ApiStages:
+        - ApiId: !Ref ServerlessRestApi
+          Stage: Prod
+    DependsOn: ServerlessRestApiProdStage
+
+  # -------------------------------------------------------------------------
+  # UsagePlanKey — the link between the API key and the usage plan.
+  # Without this, the key exists but isn't attached to anything.
+  # -------------------------------------------------------------------------
+  SummarizationUsagePlanKey:
+    Type: AWS::ApiGateway::UsagePlanKey
+    Properties:
+      KeyId: !Ref SummarizationApiKey
+      KeyType: API_KEY
+      UsagePlanId: !Ref SummarizationUsagePlan
+
+# ---------------------------------------------------------------------------
+# Outputs — printed to your terminal after `sam deploy` completes.
+# ---------------------------------------------------------------------------
+Outputs:
+  SummarizeApiUrl:
+    Description: "API Gateway endpoint — use this as your base URL in Postman"
+    Value: !Sub "https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/Prod"
+
+  ApiKeyId:
+    Description: "API Key ID — go to AWS Console > API Gateway > API Keys to view the actual key value"
+    Value: !Ref SummarizationApiKey

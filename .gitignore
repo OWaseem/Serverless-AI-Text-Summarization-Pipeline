@@ -1,0 +1,14 @@
+# AWS SAM build artifacts — generated locally, not needed in the repo
+.aws-sam/
+
+# Python cache files
+__pycache__/
+*.pyc
+*.pyo
+
+# Environment variables — never commit secrets
+.env
+.env.*
+
+# macOS system files
+.DS_Store

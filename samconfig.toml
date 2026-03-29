@@ -1,0 +1,31 @@
+# samconfig.toml — SAM deployment configuration
+# Generated once during `sam deploy --guided` and committed to the repo
+# so future deploys just need `sam deploy` with no extra flags.
+
+version = 0.1
+
+[default]
+[default.deploy]
+[default.deploy.parameters]
+
+# The name of the CloudFormation stack SAM will create in your AWS account.
+# CloudFormation is the underlying AWS service that SAM uses to manage resources.
+stack_name = "serverless-text-summarization"
+
+# AWS region to deploy into.
+# us-east-1 is recommended — it has the broadest Bedrock model availability.
+region = "us-east-1"
+
+# resolve_s3 tells SAM to automatically create and manage an S3 bucket
+# for storing Lambda deployment artifacts. No manual bucket creation needed.
+resolve_s3 = true
+
+# SAM auto-generates a unique prefix for uploaded artifacts in S3.
+s3_prefix = "serverless-text-summarization"
+
+# CAPABILITY_IAM allows SAM to create IAM roles on your behalf.
+# Required because we're defining Lambda execution roles in the template.
+capabilities = "CAPABILITY_IAM"
+
+# Automatically confirm all changeset prompts during deploy (non-interactive).
+confirm_changeset = false

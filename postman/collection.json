@@ -1,0 +1,83 @@
+{
+  "info": {
+    "name": "Serverless AI Text Summarization Pipeline",
+    "description": "Test collection for the Serverless AI Text Summarization Pipeline.\n\nSetup:\n1. Import this collection into Postman\n2. Click the collection name → Variables tab\n3. Set `base_url` to your API Gateway URL (from `sam deploy` output)\n4. Run POST /summarize first, copy the `id` from the response\n5. Paste that `id` into the GET /summary/{id} request",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "https://YOUR_API_ID.execute-api.us-east-1.amazonaws.com/Prod",
+      "description": "Replace with the API Gateway URL from `sam deploy` output"
+    },
+    {
+      "key": "record_id",
+      "value": "",
+      "description": "Paste the `id` returned from POST /summarize here to use in the GET request"
+    }
+  ],
+  "item": [
+    {
+      "name": "POST /summarize",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/summarize",
+          "host": ["{{base_url}}"],
+          "path": ["summarize"]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"text\": \"Artificial intelligence (AI) is transforming industries at an unprecedented pace. From healthcare to finance, organizations are leveraging machine learning models to automate complex tasks, uncover patterns in massive datasets, and deliver personalized experiences at scale. However, this rapid adoption also raises important questions around data privacy, algorithmic bias, and the future of human labor. Experts argue that the key to responsible AI deployment lies in transparency, diverse training data, and robust regulatory frameworks that keep pace with technological advancement.\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "description": "Submits text to the pipeline. Returns a summary, sentiment label, and a unique `id` for later retrieval."
+      },
+      "response": [
+        {
+          "name": "Example Response",
+          "status": "OK",
+          "code": 200,
+          "body": "{\n  \"id\": \"a1b2c3d4-e5f6-7890-abcd-ef1234567890\",\n  \"summary\": \"AI is rapidly transforming industries by automating tasks and personalizing experiences, but raises concerns about privacy, bias, and labor. Responsible AI requires transparency, diverse data, and strong regulation.\",\n  \"sentiment\": \"neutral\",\n  \"timestamp\": \"2025-09-15T14:23:01.123456+00:00\"\n}"
+        }
+      ]
+    },
+    {
+      "name": "GET /summary/{id}",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/summary/{{record_id}}",
+          "host": ["{{base_url}}"],
+          "path": ["summary", "{{record_id}}"]
+        },
+        "description": "Retrieves a previously stored summarization result by its ID. Use the `id` returned from POST /summarize."
+      },
+      "response": [
+        {
+          "name": "Example Response",
+          "status": "OK",
+          "code": 200,
+          "body": "{\n  \"id\": \"a1b2c3d4-e5f6-7890-abcd-ef1234567890\",\n  \"original_text\": \"Artificial intelligence (AI) is transforming...\",\n  \"summary\": \"AI is rapidly transforming industries by automating tasks and personalizing experiences, but raises concerns about privacy, bias, and labor.\",\n  \"sentiment\": \"neutral\",\n  \"timestamp\": \"2025-09-15T14:23:01.123456+00:00\"\n}"
+        },
+        {
+          "name": "Not Found",
+          "status": "Not Found",
+          "code": 404,
+          "body": "{\n  \"error\": \"No record found with id: a1b2c3d4-e5f6-7890-abcd-ef1234567890\"\n}"
+        }
+      ]
+    }
+  ]
+}
