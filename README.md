@@ -150,6 +150,52 @@ Retrieves a previously stored result by ID.
 
 ---
 
+## Usage Examples
+
+The pipeline is a standard HTTP API — anything that can make a web request can use it. Place the text you want summarized in the `"text"` field of the request body.
+
+### curl (terminal)
+```bash
+curl -X POST https://your-api-id.execute-api.us-east-1.amazonaws.com/Prod/summarize \
+  -H "Content-Type: application/json" \
+  -H "x-api-key: your-api-key" \
+  -d '{"text": "Paste any long-form text here and the pipeline will summarize it and tag its sentiment automatically."}'
+```
+
+### Python
+```python
+import requests
+
+response = requests.post(
+    "https://your-api-id.execute-api.us-east-1.amazonaws.com/Prod/summarize",
+    headers={
+        "x-api-key": "your-api-key",
+        "Content-Type": "application/json"
+    },
+    json={"text": "Paste any long-form text here."}
+)
+print(response.json())
+```
+
+### JavaScript
+```javascript
+const response = await fetch("https://your-api-id.execute-api.us-east-1.amazonaws.com/Prod/summarize", {
+  method: "POST",
+  headers: {
+    "x-api-key": "your-api-key",
+    "Content-Type": "application/json"
+  },
+  body: JSON.stringify({ text: "Paste any long-form text here." })
+});
+
+const data = await response.json();
+console.log(data);
+```
+
+Replace `your-api-id` with your API Gateway URL and `your-api-key` with your API key value.
+
+---
+
 ## Key Design Decisions
 
 | Decision | Choice | Reason |
