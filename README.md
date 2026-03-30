@@ -71,6 +71,9 @@ Client (any app or API caller)
          │
          ├── POST /summarize ──────► SummarizeFunction (Lambda)
          │                                    │
+         │                          Bedrock Guardrails
+         │                    (content filter + PII check)
+         │                                    │
          │                          ┌─────────┴──────────┐
          │                          ▼                    ▼
          │                   Amazon Bedrock          DynamoDB
@@ -101,6 +104,9 @@ The AI brain. Sends text to Anthropic's Claude Haiku 4.5 model via AWS's managed
 
 ### DynamoDB
 Persistent storage. Every result is saved with its ID, original text, summary, sentiment, and timestamp. Built for sub-10ms retrieval — results come back in under 100ms.
+
+### Amazon Bedrock Guardrails
+A content safety layer that runs on every request before the text reaches the model. It blocks hate speech, sexual content, and graphic violence, anonymizes personally identifiable information (names, emails, phone numbers), and hard-blocks sensitive data like social security numbers and credit card numbers. Requests that violate the policy are rejected with a 400 error — the model never sees the content and nothing is stored.
 
 ### CloudWatch
 Automatic logging. Every invocation is logged — timestamps, duration, memory usage, errors — with zero configuration.
@@ -215,6 +221,7 @@ Replace `your-api-id` with your API Gateway URL and `your-api-key` with your API
 | Database | DynamoDB on-demand | No capacity planning, free-tier friendly, sub-10ms reads |
 | Runtime | Python 3.11 | Stable Lambda runtime with full boto3 support |
 | Lambda timeout | 30 seconds | Bedrock calls typically take 2–5s, leaving ample buffer |
+| Content safety | Bedrock Guardrails | Blocks harmful content and anonymizes PII before the model sees it |
 
 ---
 
