@@ -15,6 +15,8 @@ Globals:
     Environment:
       Variables:
         TABLE_NAME: !Ref SummaryTable   # Injects the DynamoDB table name into every Lambda at runtime
+        GUARDRAIL_ID: "902piouo8brc"    # Bedrock Guardrail — blocks inappropriate content, PII, prompt injection
+        GUARDRAIL_VERSION: "4"
   Api:
     # Tells API Gateway to look for the API key in the request header:
     # x-api-key: <your-key>
@@ -44,11 +46,12 @@ Resources:
         # Grant this Lambda permission to write to the DynamoDB table
         - DynamoDBCrudPolicy:
             TableName: !Ref SummaryTable
-        # Grant this Lambda permission to call Bedrock models
+        # Grant this Lambda permission to call Bedrock models and apply guardrails
         - Statement:
             Effect: Allow
             Action:
               - bedrock:InvokeModel
+              - bedrock:ApplyGuardrail
             Resource: "*"
       Events:
         # This creates the API Gateway route: POST /summarize

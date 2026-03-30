@@ -15,6 +15,13 @@ bedrock = boto3.client("bedrock-runtime", region_name="us-east-1")
 dynamodb = boto3.resource("dynamodb")
 table = dynamodb.Table(os.environ["TABLE_NAME"])  # Injected by template.yaml at deploy time
 
+# Guardrail config — injected at deploy time via template.yaml environment variables.
+# The guardrail runs automatically on both the input (your text) and the model's output.
+# If content violates the policy, Bedrock returns stopReason = "guardrail_intervened"
+# instead of a normal response — we handle that case below.
+GUARDRAIL_ID = os.environ["GUARDRAIL_ID"]
+GUARDRAIL_VERSION = os.environ["GUARDRAIL_VERSION"]
+
 
 def lambda_handler(event, context):
     """
@@ -87,8 +94,23 @@ Text to analyze:
             ],
             inferenceConfig={
                 "maxTokens": 512
+            },
+            # Guardrail runs on both the incoming text (input) and the model's reply (output).
+            # If either violates the policy, stopReason will be "guardrail_intervened"
+            # and Bedrock will NOT return the model's output.
+            guardrailConfig={
+                "guardrailIdentifier": GUARDRAIL_ID,
+                "guardrailVersion": GUARDRAIL_VERSION,
+                "trace": "enabled"
             }
         )
+
+        # Check if the guardrail blocked this request before attempting to parse
+        stop_reason = bedrock_response.get("stopReason", "")
+        if stop_reason == "guardrail_intervened":
+            # Log the trace so we can see which filter triggered (visible in CloudWatch)
+            print("GUARDRAIL_TRACE:", json.dumps(bedrock_response.get("trace", {})))
+            return _response(400, {"error": "Request blocked: the submitted text contains content that violates our usage policy."})
 
         # The converse API returns the model's reply here:
         ai_text = bedrock_response["output"]["message"]["content"][0]["text"]
